@@ -24,6 +24,8 @@ namespace XPC
 	class Drawing
 	{
 	public:
+
+
 		/// Clears the current message on the screen if any and unregisters the
 		/// draw callback for message drawing.
 		static void ClearMessage();

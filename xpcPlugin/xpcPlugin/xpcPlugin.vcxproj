@@ -77,7 +77,7 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\XPlaneConnect\</OutDir>
     <TargetExt>.xpl</TargetExt>
-    <IncludePath>..\SDK\CHeaders\XPLM;$(IncludePath)</IncludePath>
+    <IncludePath>..\SDK\CHeaders\XPLM;../;$(IncludePath)</IncludePath>
     <LibraryPath>..\xpcPlugin\SDK\Libraries\Win;$(LibraryPath)</LibraryPath>
     <TargetName>win</TargetName>
   </PropertyGroup>
@@ -140,7 +140,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalDependencies>Opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Opengl32.lib;glu32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
@@ -224,6 +224,25 @@
     <Library Include="..\SDK\Libraries\Win\XPLM_64.lib" />
     <Library Include="..\SDK\Libraries\Win\XPWidgets.lib" />
     <Library Include="..\SDK\Libraries\Win\XPWidgets_64.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\FreeSans.ttf">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+    </CopyFileToFolders>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\text.f.glsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\text.v.glsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
+      <FileType>Document</FileType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">false</ExcludedFromBuild>
+    </CopyFileToFolders>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

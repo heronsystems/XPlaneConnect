@@ -20,7 +20,7 @@
 #include "XPLMDisplay.h"
 #include "XPLMGraphics.h"
 #include "XPLMDataAccess.h"
-
+#include "XPLMUtilities.h"
 
 #include <cmath>
 #include <string>
@@ -203,6 +203,28 @@ namespace XPC
 		glEnd();
 	}
 
+
+	//a : vector of heading and pitch angles in order.  Heading taken in degrees, pitch in rad
+	//    returns a 3x3 rotation matrix for Heading, Pitch.  Assume vector aligned with roll axis
+	static Eigen::Matrix3f rot_mat_HP(float a0, float a1) {
+		float neg_a_rad = -a0 * M_PI / 180.0;
+		float cos_a1 = cosf(a1);
+		float sin_a1 = sinf(a1);
+		float cos_a_rad = cosf(neg_a_rad);
+		float sin_a_rad = sinf(neg_a_rad);
+		Eigen::Matrix3f rot_Head;
+		rot_Head << cos_a_rad, -sin_a_rad, 0,
+			sin_a_rad, cos_a_rad, 0,
+			0, 0, 1;
+		Eigen::Matrix3f rot_Pitch;
+		rot_Pitch << 1, 0, 0,
+			0, cos_a1, -sin_a1,
+			0, sin_a1, cos_a1;
+
+		Eigen::Matrix3f mat = rot_Head * rot_Pitch;
+		return mat;
+	};
+
 	/// Draws the string set by the TEXT command.
 	static int MessageDrawCallback(XPLMDrawingPhase inPhase, int inIsBefore, void * inRefcon)
 	{
@@ -219,6 +241,7 @@ namespace XPC
 			XPLMDrawString(rgb, msgX, y, msgVal + newLines[i], NULL, xplmFont_Proportional);
 			y -= LINE_HEIGHT;
 		}
+		
 
 		
 		float blue_x = XPLMGetDataf(ref_blueX);
@@ -260,136 +283,110 @@ namespace XPC
 		Eigen::Vector3f v_rel = Eigen::Vector3f(v_rel_x/dist, v_rel_y/dist, v_rel_z/dist);
 		Eigen::Vector3f v = Eigen::Vector3f(0,1,0);
 
-		//a : vector of heading and pitch angles in order.  Heading taken in degrees, pitch in rad
-    	//    returns a 3x3 rotation matrix for Heading, Pitch.  Assume vector aligned with roll axis
-		auto rot_mat_HP = [](float a0, float a1) {
-			float neg_a_rad = -a0 * M_PI / 180.0;
-			float cos_a1 = cosf(a1);
-			float sin_a1 = sinf(a1);
-			float cos_a_rad = cosf(neg_a_rad);
-			float sin_a_rad = sinf(neg_a_rad);
-			Eigen::Matrix3f rot_Head;
-			rot_Head << cos_a_rad, -sin_a_rad, 0,
-						sin_a_rad, cos_a_rad, 0,
-						0, 0, 1;
-			Eigen::Matrix3f rot_Pitch;
-			rot_Pitch << 1, 0, 0,
-						 0, cos_a1, -sin_a1,
-						 0, sin_a1, cos_a1;
-
-			Eigen::Matrix3f mat = rot_Head * rot_Pitch;
-			return mat;
-		};
 		Eigen::Vector3f v_self = rot_mat_HP(blue_heading_deg, blue_pitch_deg*M_PI/180.0) * v;
 		float trackAngle_deg = 180.0 - acosf(v_rel.transpose() * v_self) * 180.0/M_PI;
 
 
-		for(size_t i = 0 ; i < numWaypoints; i++) {
-
-			Waypoint* g = &waypoints[i];
-			LocalPoint* l = &localPoints[i];
-			XPLMWorldToLocal(g->latitude, g->longitude, g->altitude,
-				&l->x, &l->y, &l->z);
+		gluProject(red_x, red_y, red_z, model_view, projection, viewport, &pos3D_x, &pos3D_y, &pos3D_z);
 
 
-			gluProject(l->x, l->y, l->z,	model_view, projection, viewport,	&pos3D_x, &pos3D_y, &pos3D_z);
+		double red_lat;
+		double red_long;
+		double red_altitude;
+		XPLMLocalToWorld(blue_x, blue_y, blue_z, &red_lat, &red_long, &red_altitude); // g->latitude, g->longitude, g->altitude, &l->x, &l->y, &l->z);
+
+		if (numWaypoints == 0) {
+			return 0;
+		}
+
+		// If track angle is greater than 180 deg do not render
+		if (trackAngle_deg > 90) {
+			return 0;
+		}
 
 
-			// If track angle is greater than 180 deg do not render
-			if(trackAngle_deg > 90) {
-				continue;
-			}
-
-			float xoff = (float)l->x - blue_x;
-			float yoff = (float)l->y - blue_y;
-			float zoff = (float)l->z - blue_z;
-			float d = sqrtf(xoff*xoff + yoff*yoff + zoff*zoff);
-			{
-				const char* msg2 = std::to_string((int)(d*3.28084)).c_str();
-				static char v2[MSG_MAX] = { 0 };
-				size_t len2 = strnlen(msg2, MSG_MAX - 1);
-				strncpy(v2, msg2, len2 + 1);
-				XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
-			}
-
-			uint64_t now_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-			if(prevDistance_time == 0)
-			{
-				prevDistance_time = now_time;
-				prevDistance_meter = d;
-			}
-			else if((now_time - prevDistance_time) >= 1000)
-			{
-				uint64_t delta_time = now_time - prevDistance_time;
-				closureCalculation_m_sec = (prevDistance_meter - d)/((float)delta_time/1000.0);
-				closureRateCalculated = true;
-				prevDistance_time = now_time;
-				prevDistance_meter = d;
-			}
-
-			if(closureRateCalculated == true)
-			{
-				const char* msg2 = std::to_string((int)(closureCalculation_m_sec*3.28084)).c_str();
-				static char v2[MSG_MAX] = { 0 };
-				size_t len2 = strnlen(msg2, MSG_MAX - 1);
-				strncpy(v2, msg2, len2 + 1);
-				XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
-			}
+		float xoff = red_x - blue_x;
+		float yoff = red_y - blue_y;
+		float zoff = red_z - blue_z;
 
 
-			{
-				const char* msg2 = std::to_string((int)(trackAngle_deg)).c_str();
-				static char v2[MSG_MAX] = { 0 };
-				size_t len2 = strnlen(msg2, MSG_MAX - 1);
-				strncpy(v2, msg2, len2 + 1);
-				XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y-20, v2, NULL, xplmFont_Proportional);
-			}
+		float d = sqrtf(xoff*xoff + yoff * yoff + zoff * zoff);
+		
+		{
+			static char v2[MSG_MAX] = { 0 };
+			sprintf(v2, "%d", (int)(d*3.28084));
+			XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
+		}
+
+		uint64_t now_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+		if(prevDistance_time == 0)
+		{
+			prevDistance_time = now_time;
+			prevDistance_meter = d;
+		}
+		else if((now_time - prevDistance_time) >= 1000)
+		{
+			uint64_t delta_time = now_time - prevDistance_time;
+			closureCalculation_m_sec = (prevDistance_meter - d)/((float)delta_time/1000.0);
+			closureRateCalculated = true;
+			prevDistance_time = now_time;
+			prevDistance_meter = d;
+		}
+
+		if(closureRateCalculated == true)
+		{
+			static char v2[MSG_MAX] = { 0 };
+			sprintf(v2, "%d", (int)(closureCalculation_m_sec*3.28084));
+			XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
+		}
 
 
-			// print altitude
-			{
-				const char* msg2 = std::to_string((int)(g->altitude*3.28084)).c_str();
-				static char v2[MSG_MAX] = { 0 };
-				size_t len2 = strnlen(msg2, MSG_MAX - 1);
-				strncpy(v2, msg2, len2 + 1);
-				XPLMDrawString(rgb2, -50 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
-			}
+		{
+			static char v2[MSG_MAX] = { 0 };
+			sprintf(v2, "%d", (int)(trackAngle_deg));
+			XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y-20, v2, NULL, xplmFont_Proportional);
+		}
+
+
+		// print altitude
+		{
+			static char v2[MSG_MAX] = { 0 };
+			sprintf(v2, "%d", (int)(red_altitude*3.28084));
+			XPLMDrawString(rgb2, -50 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
+		}
 
 			
-			// Calculate target speed
+		// Calculate target speed
+		targetSpeedCalculated = true;
+		bool SetTargetSpeedVariables = false;
+		if(target_prev_time == 0) {
+			SetTargetSpeedVariables = true;
+		}
+		else if((now_time - target_prev_time) >= 1000)
+		{
+			uint64_t delta_time = now_time - target_prev_time;
+			float off_x = red_x - target_prev_pos_x;
+			float off_y = red_y - target_prev_pos_y;
+			float off_z = red_z - target_prev_pos_z;
+			float dist = sqrtf(off_x*off_x + off_y*off_y + off_z*off_z);
+			targetSpeed_m_sec = (dist)/((float)delta_time/1000.0);
 			targetSpeedCalculated = true;
-			bool SetTargetSpeedVariables = false;
-			if(target_prev_time == 0) {
-				SetTargetSpeedVariables = true;
-			}
-			else if((now_time - target_prev_time) >= 1000)
-			{
-				uint64_t delta_time = now_time - target_prev_time;
-				float off_x = (float)l->x - target_prev_pos_x;
-				float off_y = (float)l->y - target_prev_pos_y;
-				float off_z = (float)l->z - target_prev_pos_z;
-				float dist = sqrtf(off_x*off_x + off_y*off_y + off_z*off_z);
-				targetSpeed_m_sec = (dist)/((float)delta_time/1000.0);
-				targetSpeedCalculated = true;
-				SetTargetSpeedVariables = true;
-			}
+			SetTargetSpeedVariables = true;
+		}
 
-			if(SetTargetSpeedVariables == true)
-			{
-				target_prev_pos_x = l->x;
-				target_prev_pos_y = l->y;
-				target_prev_pos_z = l->z;
-				target_prev_time = now_time;
-			}
+		if(SetTargetSpeedVariables == true)
+		{
+			target_prev_pos_x = red_x;
+			target_prev_pos_y = red_y;
+			target_prev_pos_z = red_z;
+			target_prev_time = now_time;
+		}
 
-			if(targetSpeedCalculated == true)
-			{
-				const char* msg2 = std::to_string((int)(targetSpeed_m_sec*3.28084)).c_str();
-				static char v2[MSG_MAX] = { 0 };
-				size_t len2 = strnlen(msg2, MSG_MAX - 1);
-				strncpy(v2, msg2, len2 + 1);
-				XPLMDrawString(rgb2, -50 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
-			}
+		if(targetSpeedCalculated == true)
+		{
+			static char v2[MSG_MAX] = { 0 };
+			sprintf(v2, "%d", (int)(targetSpeed_m_sec*3.28084));
+			XPLMDrawString(rgb2, -50 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
 		}
 
 		return 0;
@@ -398,58 +395,93 @@ namespace XPC
 	/// Draws waypoints.
 	static int RouteDrawCallback(XPLMDrawingPhase inPhase, int inIsBefore, void * inRefcon)
 	{
-		
+		// XPLMCommandOnce(XPLMFindCommand("sim/VR/general/reset_view"));
 
+		glGetDoublev(GL_MODELVIEW_MATRIX, model_view);
+
+		glGetDoublev(GL_PROJECTION_MATRIX, projection);
+
+		glGetIntegerv(GL_VIEWPORT, viewport);
+		
+		if (numWaypoints == 0) {
+			return 0;
+		}
 
 		float blue_x = XPLMGetDataf(ref_blueX);
 		float blue_y = XPLMGetDataf(ref_blueY);
 		float blue_z = XPLMGetDataf(ref_blueZ);
 
-		for(size_t i = 0 ; i < numWaypoints; i++) {
-			Waypoint* g = &waypoints[i];
-			LocalPoint* l = &localPoints[i];
-			XPLMWorldToLocal(g->latitude, g->longitude, g->altitude,
-				&l->x, &l->y, &l->z);
+		float blue_heading_deg = XPLMGetDataf(ref_blueHeading_deg);
+		float blue_pitch_deg = XPLMGetDataf(ref_bluePitch_deg);
 
-			
-			glGetDoublev(GL_MODELVIEW_MATRIX, model_view);
-			
-			glGetDoublev(GL_PROJECTION_MATRIX, projection);
-			
-			glGetIntegerv(GL_VIEWPORT, viewport);	
+		float red_x = XPLMGetDataf(ref_redX);
+		float red_y = XPLMGetDataf(ref_redY);
+		float red_z = XPLMGetDataf(ref_redZ);
 
-			gluProject(blue_x, blue_y, blue_z,	model_view, projection, viewport,	&pos3D_x, &pos3D_y, &pos3D_z);
+		float red_heading_deg = XPLMGetDataf(ref_redHeading_deg);
+		float red_pitch_deg = XPLMGetDataf(ref_redPitch_deg);
+		float red_roll_deg = XPLMGetDataf(ref_redRoll_deg);
 
 
-			// Draw posts
+		/*glColor3f(1.0F, 1.0F, 1.0F);
+		glBegin(GL_LINES);
+		glVertex3f((float)red_x, (float)red_y, (float)red_z);
+		glVertex3f((float)red_x, -1000.0F, (float)red_z);
+		glEnd();*/
+
+
+		XPLMDataRef vr_dref = XPLMFindDataRef("sim/graphics/VR/enabled");
+		const bool vr_is_enabled = XPLMGetDatai(vr_dref);
+
+		if (vr_is_enabled) {
+
 			glColor3f(1.0F, 1.0F, 1.0F);
 			glBegin(GL_LINES);
-			glVertex3f((float)l->x, (float)l->y, (float)l->z);
-			glVertex3f((float)l->x, -1000.0F, (float)l->z);
+			glVertex3f((float)blue_x, (float)blue_y, (float)blue_z);
+			glVertex3f((float)red_x, (float)red_y, (float)red_z);
 			glEnd();
 
-			// Draw route
-			// glColor3f(1.0F, 1.0F, 0.0F);
-			// glBegin(GL_LINE_STRIP);
-			// glVertex3f((float)l->x, (float)l->y, (float)l->z);
-			// glVertex3f(blue_x, blue_y, blue_z);
-			// glEnd();
 
-			
-			// Draw markers
-			float xoff = (float)l->x - blue_x;
-			float yoff = (float)l->y - blue_y;
-			float zoff = (float)l->z - blue_z;
-			float d = sqrtf(xoff*xoff + yoff*yoff + zoff*zoff);
+			Eigen::Matrix3f blue_rot;
+			blue_rot = Eigen::AngleAxisf(-blue_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
+				* Eigen::AngleAxisf(blue_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX());
 
-			float f = 1.0F;
-			if(d < 8000) {
-				f = (d/8000);
-			}
-
-			glColor3f(1.0F, f, f);
-			gl_drawCube((float)l->x, (float)l->y, (float)l->z, d);
+			Eigen::Vector3f v_self = blue_rot * Eigen::Vector3f(0, 0, -10000);
+			glColor3f(0.0F, 0.0F, 0.0F);
+			glBegin(GL_LINES);
+			glVertex3f((float)blue_x, (float)blue_y, (float)blue_z);
+			glVertex3f(blue_x + v_self[0], blue_y + v_self[1], blue_z + v_self[2]);
+			glEnd();
 		}
+
+
+		Eigen::Matrix3f red_rot;
+		red_rot = Eigen::AngleAxisf(-red_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
+			* Eigen::AngleAxisf(red_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX())
+			* Eigen::AngleAxisf(red_roll_deg*M_PI / 180.0, Eigen::Vector3f::UnitZ());
+
+		Eigen::Vector3f red_back = red_rot * Eigen::Vector3f(0, 0, 10000);
+		glColor3f(0.0F, 1.0F, 0.0F);
+		glBegin(GL_LINES);
+		glVertex3f((float)red_x, (float)red_y, (float)red_z);
+		glVertex3f(red_x + red_back[0], red_y + red_back[1], red_z + red_back[2]);
+		glEnd();
+
+		Eigen::Vector3f red_down = red_rot * Eigen::Vector3f(0, 100, 0);
+		glColor3f(1.0F, 0.0F, 0.0F);
+		glBegin(GL_LINES);
+		glVertex3f((float)red_x, (float)red_y, (float)red_z);
+		glVertex3f(red_x + red_down[0], red_y + red_down[1], red_z + red_down[2]);
+		glEnd();
+
+
+		Eigen::Vector3f red_right = red_rot * Eigen::Vector3f(-100, 0, 0);
+		glColor3f(0.0F, 0.0F, 1.0F);
+		glBegin(GL_LINES);
+		glVertex3f((float)red_x, (float)red_y, (float)red_z);
+		glVertex3f(red_x + red_right[0], red_y + red_right[1], red_z + red_right[2]);
+		glEnd();
+
 		return 0;
 	}
 
@@ -499,6 +531,7 @@ namespace XPC
 		if (routeEnabled)
 		{
 			XPLMUnregisterDrawCallback(RouteDrawCallback, xplm_Phase_Objects, 0, NULL);
+			ClearMessage();
 		}
 		return;
 	}

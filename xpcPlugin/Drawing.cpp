@@ -47,23 +47,6 @@
 #include <Eigen/Geometry> 
 
 
-GLuint vbo;
-
-GLuint program;
-GLint attribute_coord;
-GLint uniform_tex;
-GLint uniform_color;
-
-struct point {
-	GLfloat x;
-	GLfloat y;
-	GLfloat s;
-	GLfloat t;
-};
-
-double TEST = 5;
-
-
 namespace XPC
 {
 	// Internal Structures
@@ -84,7 +67,7 @@ namespace XPC
 	static size_t newLineCount = 0;
 	static size_t newLines[MSG_LINE_MAX] = { 0 };
 	static float rgb[3] = { 0.25F, 1.0F, 0.25F };
-	static float rgb2[3] = { 1.0F, 0.0F, 0.0F };
+	static float rgb_red[3] = { 1.0F, 0.0F, 0.0F };
 
 	static const size_t WAYPOINT_MAX = 128;
 	static bool routeEnabled = false;
@@ -108,14 +91,8 @@ namespace XPC
 	XPLMDataRef ref_redHeading_deg;
 	XPLMDataRef ref_redRoll_deg;
 
-	XPLMDataRef ref_cam_x;
-	XPLMDataRef	ref_cam_y;
-	XPLMDataRef	ref_cam_z;
-
 	XPLMDataRef ref_cam_pitch;
 	XPLMDataRef ref_cam_vert_FOV_deg;
-
-	XPLMDataRef ref_window_height;
 
 
 	GLdouble model_view[16];		
@@ -243,6 +220,9 @@ namespace XPC
 		}
 		
 
+		if (numWaypoints == 0) {
+			return 0;
+		}
 		
 		float blue_x = XPLMGetDataf(ref_blueX);
 		float blue_y = XPLMGetDataf(ref_blueY);
@@ -258,20 +238,6 @@ namespace XPC
 
 		float red_heading_deg = XPLMGetDataf(ref_redHeading_deg);
 		float red_pitch_deg = XPLMGetDataf(ref_redPitch_deg);
-
-		float cx = XPLMGetDataf(ref_cam_x);
-		float cy = XPLMGetDataf(ref_cam_y);
-		float cz = XPLMGetDataf(ref_cam_z);
-
-		Eigen::Matrix3f blue_rot;
-		blue_rot = Eigen::AngleAxisf(blue_heading_deg*M_PI/180.0,  Eigen::Vector3f::UnitZ())
-  				   * Eigen::AngleAxisf(blue_pitch_deg*M_PI/180.0,   Eigen::Vector3f::UnitY());
-
-		Eigen::Matrix3f red_rot;
-		red_rot = Eigen::AngleAxisf(red_heading_deg*M_PI/180.0,  Eigen::Vector3f::UnitZ())
-  				   * Eigen::AngleAxisf(red_pitch_deg*M_PI/180.0,   Eigen::Vector3f::UnitY());
-
-		Eigen::Matrix3f T = blue_rot * red_rot.transpose();
 
 
 		// Xplane is not NEU
@@ -295,9 +261,7 @@ namespace XPC
 		double red_altitude;
 		XPLMLocalToWorld(blue_x, blue_y, blue_z, &red_lat, &red_long, &red_altitude); // g->latitude, g->longitude, g->altitude, &l->x, &l->y, &l->z);
 
-		if (numWaypoints == 0) {
-			return 0;
-		}
+		
 
 		// If track angle is greater than 180 deg do not render
 		if (trackAngle_deg > 90) {
@@ -315,7 +279,7 @@ namespace XPC
 		{
 			static char v2[MSG_MAX] = { 0 };
 			sprintf(v2, "%d", (int)(d*3.28084));
-			XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
+			XPLMDrawString(rgb_red, makerSize(d) + 5 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
 		}
 
 		uint64_t now_time = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -337,14 +301,14 @@ namespace XPC
 		{
 			static char v2[MSG_MAX] = { 0 };
 			sprintf(v2, "%d", (int)(closureCalculation_m_sec*3.28084));
-			XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
+			XPLMDrawString(rgb_red, makerSize(d) + 5 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
 		}
 
 
 		{
 			static char v2[MSG_MAX] = { 0 };
 			sprintf(v2, "%d", (int)(trackAngle_deg));
-			XPLMDrawString(rgb2, makerSize(d) + 5 + pos3D_x, pos3D_y-20, v2, NULL, xplmFont_Proportional);
+			XPLMDrawString(rgb_red, makerSize(d) + 5 + pos3D_x, pos3D_y-20, v2, NULL, xplmFont_Proportional);
 		}
 
 
@@ -352,7 +316,7 @@ namespace XPC
 		{
 			static char v2[MSG_MAX] = { 0 };
 			sprintf(v2, "%d", (int)(red_altitude*3.28084));
-			XPLMDrawString(rgb2, -50 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
+			XPLMDrawString(rgb_red, -50 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
 		}
 
 			
@@ -386,7 +350,7 @@ namespace XPC
 		{
 			static char v2[MSG_MAX] = { 0 };
 			sprintf(v2, "%d", (int)(targetSpeed_m_sec*3.28084));
-			XPLMDrawString(rgb2, -50 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
+			XPLMDrawString(rgb_red, -50 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
 		}
 
 		return 0;
@@ -395,17 +359,16 @@ namespace XPC
 	/// Draws waypoints.
 	static int RouteDrawCallback(XPLMDrawingPhase inPhase, int inIsBefore, void * inRefcon)
 	{
-		// XPLMCommandOnce(XPLMFindCommand("sim/VR/general/reset_view"));
+		if (numWaypoints == 0) {
+			return 0;
+		}
 
 		glGetDoublev(GL_MODELVIEW_MATRIX, model_view);
 
 		glGetDoublev(GL_PROJECTION_MATRIX, projection);
 
 		glGetIntegerv(GL_VIEWPORT, viewport);
-		
-		if (numWaypoints == 0) {
-			return 0;
-		}
+
 
 		float blue_x = XPLMGetDataf(ref_blueX);
 		float blue_y = XPLMGetDataf(ref_blueY);
@@ -571,14 +534,8 @@ namespace XPC
 			ref_redHeading_deg = XPLMFindDataRef("sim/multiplayer/position/plane1_psi");
 			ref_redRoll_deg = XPLMFindDataRef("sim/multiplayer/position/plane1_phi");
 
-			ref_cam_x = XPLMFindDataRef("sim/graphics/view/view_x");
-			ref_cam_y = XPLMFindDataRef("sim/graphics/view/view_y");
-			ref_cam_z = XPLMFindDataRef("sim/graphics/view/view_z");
-
 			ref_cam_pitch = XPLMFindDataRef("sim/graphics/view/view_pitch");
 			ref_cam_vert_FOV_deg = XPLMFindDataRef("sim/graphics/view/field_of_view_deg");
-
-			ref_window_height = XPLMFindDataRef("sim/graphics/view/window_height");
 		}
 	}
 

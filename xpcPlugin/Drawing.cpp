@@ -113,6 +113,17 @@ namespace XPC
 	bool targetSpeedCalculated = false;
 	float targetSpeed_m_sec = 0;
 
+
+	float fps_to_knot = 0.592484;
+	float meter_to_ft = 3.28084;
+
+	float conversion_speed = meter_to_ft * fps_to_knot;
+	float conversion_distance = meter_to_ft;
+
+	float score_WEZ_angle_deg = 1;
+	float score_WEZ_min_ft = 500;
+	float score_WEZ_max_ft = 3000;
+
 	// Internal Functions
 
 	/// Comparse two size_t integers. Used by qsort in RemoveWaypoints.
@@ -178,6 +189,24 @@ namespace XPC
 		glVertex3f(x + h, y - h, z + h);
 
 		glEnd();
+	}
+
+
+	static void gl_drawSphere(float x, float y, float z, float r)
+	{
+		int slices = 100;
+		int stacks = 100;
+
+		glPushMatrix();
+		// Draw sphere (possible styles: FILL, LINE, POINT).
+		//gl.glColor3f(0.3f, 0.5f, 1f);
+		glTranslated(x, y, z);
+		GLUquadric *sphere = gluNewQuadric();
+		gluSphere(sphere, r, slices, stacks);
+		gluDeleteQuadric(sphere);
+		glPopMatrix();
+
+		
 	}
 
 
@@ -275,10 +304,9 @@ namespace XPC
 
 
 		float d = sqrtf(xoff*xoff + yoff * yoff + zoff * zoff);
-		
 		{
 			static char v2[MSG_MAX] = { 0 };
-			sprintf(v2, "%d", (int)(d*3.28084));
+			sprintf(v2, "%d", (int)(d*conversion_distance));
 			XPLMDrawString(rgb_red, makerSize(d) + 5 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
 		}
 
@@ -300,7 +328,7 @@ namespace XPC
 		if(closureRateCalculated == true)
 		{
 			static char v2[MSG_MAX] = { 0 };
-			sprintf(v2, "%d", (int)(closureCalculation_m_sec*3.28084));
+			sprintf(v2, "%d", (int)(closureCalculation_m_sec*conversion_speed));
 			XPLMDrawString(rgb_red, makerSize(d) + 5 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
 		}
 
@@ -315,7 +343,7 @@ namespace XPC
 		// print altitude
 		{
 			static char v2[MSG_MAX] = { 0 };
-			sprintf(v2, "%d", (int)(red_altitude*3.28084));
+			sprintf(v2, "%d", (int)(red_altitude*conversion_distance));
 			XPLMDrawString(rgb_red, -50 + pos3D_x, pos3D_y, v2, NULL, xplmFont_Proportional);
 		}
 
@@ -349,7 +377,7 @@ namespace XPC
 		if(targetSpeedCalculated == true)
 		{
 			static char v2[MSG_MAX] = { 0 };
-			sprintf(v2, "%d", (int)(targetSpeed_m_sec*3.28084));
+			sprintf(v2, "%d", (int)(targetSpeed_m_sec*conversion_speed));
 			XPLMDrawString(rgb_red, -50 + pos3D_x, pos3D_y-10, v2, NULL, xplmFont_Proportional);
 		}
 
@@ -363,6 +391,7 @@ namespace XPC
 			return 0;
 		}
 
+		
 		glGetDoublev(GL_MODELVIEW_MATRIX, model_view);
 
 		glGetDoublev(GL_PROJECTION_MATRIX, projection);
@@ -385,16 +414,49 @@ namespace XPC
 		float red_pitch_deg = XPLMGetDataf(ref_redPitch_deg);
 		float red_roll_deg = XPLMGetDataf(ref_redRoll_deg);
 
+		// Xplane is not NEU
+		float v_rel_x = -(red_x - blue_x);
+		float v_rel_y = (red_z - blue_z);
+		float v_rel_z = -(red_y - blue_y);
+		float dist_m = sqrtf(v_rel_x*v_rel_x + v_rel_y * v_rel_y + v_rel_z * v_rel_z);
 
-		/*glColor3f(1.0F, 1.0F, 1.0F);
+		Eigen::Matrix3f blue_rot;
+		blue_rot = Eigen::AngleAxisf(-blue_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
+			* Eigen::AngleAxisf(blue_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX());
+
+		Eigen::Matrix3f red_rot;
+		red_rot = Eigen::AngleAxisf(-red_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
+			* Eigen::AngleAxisf(red_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX())
+			* Eigen::AngleAxisf(red_roll_deg*M_PI / 180.0, Eigen::Vector3f::UnitZ());
+
+		Eigen::Vector3f v_rel = Eigen::Vector3f(v_rel_x / dist_m, v_rel_y / dist_m, v_rel_z / dist_m);
+		Eigen::Vector3f v = Eigen::Vector3f(0, 1, 0);
+
+		Eigen::Vector3f v_self_track_angle = rot_mat_HP(blue_heading_deg, blue_pitch_deg*M_PI / 180.0) * v;
+		float trackAngle_deg = 180.0 - acosf(v_rel.transpose() * v_self_track_angle) * 180.0 / M_PI;
+
+		float score_dist = 3000;
+		if (dist_m < 3000) {
+			score_dist = dist_m;
+		}
+
+
+		Eigen::Vector3f blue_forward = blue_rot * Eigen::Vector3f(0, 0, -score_dist);
+		Eigen::Vector3f red_forward = red_rot * Eigen::Vector3f(0, 0, -score_dist);
+
+		glLineWidth(2.0);
+		
+		/*
+		glColor3f(0.0F, 0.0F, 0.0F);
 		glBegin(GL_LINES);
 		glVertex3f((float)red_x, (float)red_y, (float)red_z);
 		glVertex3f((float)red_x, -1000.0F, (float)red_z);
-		glEnd();*/
+		glEnd();
+		*/
 
 
 		XPLMDataRef vr_dref = XPLMFindDataRef("sim/graphics/VR/enabled");
-		const bool vr_is_enabled = XPLMGetDatai(vr_dref);
+		bool vr_is_enabled = XPLMGetDatai(vr_dref);
 
 		if (vr_is_enabled) {
 
@@ -405,23 +467,21 @@ namespace XPC
 			glEnd();
 
 
-			Eigen::Matrix3f blue_rot;
-			blue_rot = Eigen::AngleAxisf(-blue_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
-				* Eigen::AngleAxisf(blue_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX());
+			
 
-			Eigen::Vector3f v_self = blue_rot * Eigen::Vector3f(0, 0, -10000);
-			glColor3f(0.0F, 0.0F, 0.0F);
+			// Draw line from self, to the score distance
+			if(dist_m < 3000/meter_to_ft)
+				glColor3f(0.0F, 1.0F, 0.0F);
+			else
+				glColor3f(0.0F, 0.0F, 0.0F);
 			glBegin(GL_LINES);
 			glVertex3f((float)blue_x, (float)blue_y, (float)blue_z);
-			glVertex3f(blue_x + v_self[0], blue_y + v_self[1], blue_z + v_self[2]);
+			glVertex3f(blue_x + blue_forward[0], blue_y + blue_forward[1], blue_z + blue_forward[2]);
 			glEnd();
 		}
 
 
-		Eigen::Matrix3f red_rot;
-		red_rot = Eigen::AngleAxisf(-red_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
-			* Eigen::AngleAxisf(red_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX())
-			* Eigen::AngleAxisf(red_roll_deg*M_PI / 180.0, Eigen::Vector3f::UnitZ());
+		
 
 		Eigen::Vector3f red_back = red_rot * Eigen::Vector3f(0, 0, 10000);
 		glColor3f(0.0F, 1.0F, 0.0F);
@@ -438,12 +498,68 @@ namespace XPC
 		glEnd();
 
 
-		Eigen::Vector3f red_right = red_rot * Eigen::Vector3f(-100, 0, 0);
+		Eigen::Vector3f red_right = red_rot * Eigen::Vector3f(100, 0, 0);
 		glColor3f(0.0F, 0.0F, 1.0F);
 		glBegin(GL_LINES);
 		glVertex3f((float)red_x, (float)red_y, (float)red_z);
 		glVertex3f(red_x + red_right[0], red_y + red_right[1], red_z + red_right[2]);
 		glEnd();
+
+		if (trackAngle_deg > 90) {
+
+
+			glColor3f(1.0F, 0.0F, 0.0F);
+			glBegin(GL_LINES);
+			glVertex3f((float)red_x, (float)red_y, (float)red_z);
+			glVertex3f(red_x + red_forward[0], red_y + red_forward[1], red_z + red_forward[2]);
+			glEnd();
+
+			float p_x = blue_x + blue_forward[0] + (blue_x - (red_x + red_forward[0]));
+			float p_y = blue_y + blue_forward[1] + (blue_y - (red_y + red_forward[1]));
+			float p_z = blue_z + blue_forward[2];
+
+
+			Eigen::Vector3f red_down = red_rot * Eigen::Vector3f(0, 5, 0);
+			glColor3f(1.0F, 0.0F, 0.0F);
+			glBegin(GL_LINES);
+			glVertex3f(p_x, p_y, p_z);
+			glVertex3f(p_x + red_down[0], p_y + red_down[1], p_z + red_down[2]);
+			glEnd();
+
+
+			Eigen::Vector3f red_right = red_rot * Eigen::Vector3f(5, 0, 0);
+			glColor3f(0.0F, 0.0F, 1.0F);
+			glBegin(GL_LINES);
+			glVertex3f(p_x, p_y, p_z);
+			glVertex3f(p_x + red_right[0], p_y + red_right[1], p_z + red_right[2]);
+			glEnd();
+			
+
+
+			/*
+			Eigen::Vector3f red_right = red_rot * Eigen::Vector3f(100, 0, 0);
+			glColor3f(0.0F, 0.0F, 1.0F);
+			glBegin(GL_LINES);
+			glVertex3f((float)red_x, (float)red_y, (float)red_z);
+			glVertex3f(red_x + red_right[0], red_y + red_right[1], red_z + red_right[2]);
+			glEnd();
+			*/
+		}
+
+		// Draw WEZ Circle (really a sphere)
+		float r = dist_m * (score_WEZ_angle_deg*M_PI / 180.0);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		if (dist_m < 3000 / meter_to_ft)
+			if(trackAngle_deg > 90)
+				glColor4f(1.0F, 0.0F, 0.0F, 0.5);
+			else
+				glColor4f(0.0F, 1.0F, 0.0F, 0.5);
+			
+		else
+			glColor4f(0.0F, 0.0F, 0.0F, 0.5);
+		gl_drawSphere(blue_x + blue_forward[0], blue_y + blue_forward[1], blue_z + blue_forward[2], r);
+		glDisable(GL_BLEND);
 
 		return 0;
 	}

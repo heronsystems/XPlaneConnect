@@ -427,7 +427,7 @@ namespace XPC
 		Eigen::Matrix3f red_rot;
 		red_rot = Eigen::AngleAxisf(-red_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
 			* Eigen::AngleAxisf(red_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX())
-			* Eigen::AngleAxisf(red_roll_deg*M_PI / 180.0, Eigen::Vector3f::UnitZ());
+			* Eigen::AngleAxisf(-red_roll_deg*M_PI / 180.0, Eigen::Vector3f::UnitZ());
 
 		Eigen::Vector3f v_rel = Eigen::Vector3f(v_rel_x / dist_m, v_rel_y / dist_m, v_rel_z / dist_m);
 		Eigen::Vector3f v = Eigen::Vector3f(0, 1, 0);
@@ -506,13 +506,6 @@ namespace XPC
 		glEnd();
 
 		if (trackAngle_deg > 90) {
-
-
-			glColor3f(1.0F, 0.0F, 0.0F);
-			glBegin(GL_LINES);
-			glVertex3f((float)red_x, (float)red_y, (float)red_z);
-			glVertex3f(red_x + red_forward[0], red_y + red_forward[1], red_z + red_forward[2]);
-			glEnd();
 
 			float p_x = blue_x + blue_forward[0] + (blue_x - (red_x + red_forward[0]));
 			float p_y = blue_y + blue_forward[1] + (blue_y - (red_y + red_forward[1]));

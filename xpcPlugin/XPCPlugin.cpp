@@ -61,6 +61,7 @@
 #include "MessageHandlers.h"
 #include "UDPSocket.h"
 #include "Timer.h"
+#include "HTTPServer.h"
 
 // XPLM Includes
 #include "XPLMProcessing.h"
@@ -75,6 +76,7 @@
 #endif
 
 #define RECVPORT 49009 // Port that the plugin receives commands on
+#define RECVPORT_HTTP 49010
 #define OPS_PER_CYCLE 20 // Max Number of operations per cycle
 
 #define XPC_PLUGIN_VERSION "1.3-rc.1"
@@ -82,6 +84,7 @@
 using namespace std;
 
 XPC::UDPSocket* sock = NULL;
+XPC::HTTPServer* server = NULL;
 XPC::Timer* timer = NULL;
 
 double start;
@@ -133,6 +136,9 @@ PLUGIN_API void XPluginDisable(void)
 	delete sock;
 	sock = NULL;
 
+	delete server;
+	server = NULL;
+
 	// Stop rendering messages to screen.
 	XPC::Drawing::ClearMessage();
 
@@ -172,6 +178,9 @@ PLUGIN_API int XPluginEnable(void)
 	timer->start(chrono::milliseconds(1000), [=]{
 		XPC::MessageHandlers::SendBeacon(XPC_PLUGIN_VERSION, RECVPORT, xpVer);
 	});
+
+
+	server = new XPC::HTTPServer(RECVPORT_HTTP, RECVPORT);
 	
 
 	return 1;

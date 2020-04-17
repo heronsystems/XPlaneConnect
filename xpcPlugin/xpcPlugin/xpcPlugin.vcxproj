@@ -305,15 +305,18 @@
   <ItemGroup>
     <ClInclude Include="..\DataManager.h" />
     <ClInclude Include="..\Drawing.h" />
+    <ClInclude Include="..\HTTPServer.h" />
     <ClInclude Include="..\Log.h" />
     <ClInclude Include="..\Message.h" />
     <ClInclude Include="..\MessageHandlers.h" />
     <ClInclude Include="..\Timer.h" />
     <ClInclude Include="..\UDPSocket.h" />
+    <ClInclude Include="httplib.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\DataManager.cpp" />
     <ClCompile Include="..\Drawing.cpp" />
+    <ClCompile Include="..\HTTPServer.cpp" />
     <ClCompile Include="..\Log.cpp" />
     <ClCompile Include="..\Message.cpp" />
     <ClCompile Include="..\MessageHandlers.cpp" />

@@ -745,24 +745,24 @@ namespace XPC
 		}
 		const unsigned char* buffer = msg.GetBuffer();
 		int type = *((int*)(buffer + 5));
-		XPLMCommandKeyStroke(type);
-		
-		if(type == 79 && enable_camera_location == 1) // runway camera view
-		{
-			static struct CameraProperties campos;
-		
-			campos.loc[0] = *(double*)(buffer+9);
-			campos.loc[1] = *(double*)(buffer+17);
-			campos.loc[2] = *(double*)(buffer+25);
-			campos.direction[0] = -998;
-			campos.direction[1] = -998;
-			campos.direction[2] = -998;
-			campos.zoom	  = *(float*)(buffer+33);
-			
-			Log::FormatLine(LOG_TRACE, "VIEW", "Cam pos %f %f %f zoom %f", campos.loc[0], campos.loc[1], campos.loc[2],campos.zoom);
-		
-			XPLMControlCamera(xplm_ControlCameraUntilViewChanges, CamFunc, &campos);
-		}
+		//XPLMCommandKeyStroke(type);
+		//
+		//if(type == 79 && enable_camera_location == 1) // runway camera view
+		//{
+		//	static struct CameraProperties campos;
+		//
+		//	campos.loc[0] = *(double*)(buffer+9);
+		//	campos.loc[1] = *(double*)(buffer+17);
+		//	campos.loc[2] = *(double*)(buffer+25);
+		//	campos.direction[0] = -998;
+		//	campos.direction[1] = -998;
+		//	campos.direction[2] = -998;
+		//	campos.zoom	  = *(float*)(buffer+33);
+		//	
+		//	Log::FormatLine(LOG_TRACE, "VIEW", "Cam pos %f %f %f zoom %f", campos.loc[0], campos.loc[1], campos.loc[2],campos.zoom);
+		//
+		//	XPLMControlCamera(xplm_ControlCameraUntilViewChanges, CamFunc, &campos);
+		//}
 	}
 	
 	int MessageHandlers::CamFunc( XPLMCameraPosition_t * outCameraPosition, int inIsLosingControl, void *inRefcon)

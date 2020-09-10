@@ -9,6 +9,8 @@
 
 #include "XPLMCamera.h"
 
+#include "ISocket.h"
+
 
 namespace XPC
 {
@@ -37,7 +39,7 @@ namespace XPC
 		static void HandleMessage(Message& msg);
 
 		/// Sets the socket that message handlers use to send responses.
-		static void SetSocket(UDPSocket* socket);
+		static void SetSocket(ISocket* socket);
 		
 		static void SendBeacon(const std::string& pluginVersion, unsigned short pluginReceivePort, int xplaneVersion);
 
@@ -81,7 +83,7 @@ namespace XPC
 		static std::map<std::string, MessageHandler> handlers;
 		static std::string connectionKey; // The current connection ip:port string
 		static ConnectionInfo connection; // The current connection record
-		static UDPSocket* sock; // Outgoing network socket
+		static ISocket* sock; // Outgoing network socket
 	};
 }
 #endif

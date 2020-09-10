@@ -84,7 +84,7 @@ namespace XPC
 #endif
 	}
 
-	int UDPSocket::Read(unsigned char* dst, int maxLen, sockaddr* recvAddr) const
+	int UDPSocket::Read(unsigned char* dst, int maxLen, sockaddr* recvAddr)
 	{
 		socklen_t recvaddrlen = sizeof(*recvAddr);
 		int status = 0;

@@ -258,6 +258,7 @@
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <InlineFunctionExpansion />
       <ExceptionHandling>false</ExceptionHandling>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\websocketpp;$(SolutionDir)..\asio-1.16.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -306,11 +307,13 @@
     <ClInclude Include="..\DataManager.h" />
     <ClInclude Include="..\Drawing.h" />
     <ClInclude Include="..\HTTPServer.h" />
+    <ClInclude Include="..\ISocket.h" />
     <ClInclude Include="..\Log.h" />
     <ClInclude Include="..\Message.h" />
     <ClInclude Include="..\MessageHandlers.h" />
     <ClInclude Include="..\Timer.h" />
     <ClInclude Include="..\UDPSocket.h" />
+    <ClInclude Include="..\WebSocket.h" />
     <ClInclude Include="httplib.h" />
   </ItemGroup>
   <ItemGroup>
@@ -322,6 +325,7 @@
     <ClCompile Include="..\MessageHandlers.cpp" />
     <ClCompile Include="..\Timer.cpp" />
     <ClCompile Include="..\UDPSocket.cpp" />
+    <ClCompile Include="..\WebSocket.cpp" />
     <ClCompile Include="..\XPCPlugin.cpp" />
   </ItemGroup>
   <ItemGroup>

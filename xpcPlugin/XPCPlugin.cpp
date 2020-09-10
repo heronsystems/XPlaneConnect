@@ -62,6 +62,7 @@
 #include "UDPSocket.h"
 #include "Timer.h"
 #include "HTTPServer.h"
+#include "WebSocket.h"
 
 // XPLM Includes
 #include "XPLMProcessing.h"
@@ -77,6 +78,7 @@
 
 #define RECVPORT 49009 // Port that the plugin receives commands on
 #define RECVPORT_HTTP 49010
+#define WSPORT 49011
 #define OPS_PER_CYCLE 20 // Max Number of operations per cycle
 
 #define XPC_PLUGIN_VERSION "1.3-rc.1"
@@ -85,6 +87,7 @@ using namespace std;
 
 XPC::UDPSocket* sock = NULL;
 XPC::HTTPServer* server = NULL;
+XPC::WebSocket* wsServer = NULL;
 XPC::Timer* timer = NULL;
 
 double start;
@@ -139,6 +142,9 @@ PLUGIN_API void XPluginDisable(void)
 	delete server;
 	server = NULL;
 
+	delete wsServer;
+	wsServer = NULL;
+
 	// Stop rendering messages to screen.
 	XPC::Drawing::ClearMessage();
 
@@ -156,6 +162,8 @@ PLUGIN_API int XPluginEnable(void)
 {
 	// Open sockets
 	sock = new XPC::UDPSocket(RECVPORT);
+
+	wsServer = new XPC::WebSocket(WSPORT);
 	timer = new XPC::Timer();
 	
 	XPC::MessageHandlers::SetSocket(sock);
@@ -215,13 +223,30 @@ float XPCFlightLoopCallback(float inElapsedSinceLastCall,
 			start = (double)mach_absolute_time( ) * timeConvert;
 #endif
 		}
+		
+		bool messageExists = false;
+		std::list<XPC::Message> msg = XPC::Message::ReadFrom(*sock);
+		for (auto it = msg.begin(); it != msg.end(); ++it) {
+			if (it->GetHead() != "")
+			{
+				messageExists = true;
+				XPC::MessageHandlers::HandleMessage(*it);
+			}
+		}
 
-		XPC::Message msg = XPC::Message::ReadFrom(*sock);
-		if (msg.GetHead() == "")
-		{
+
+		msg = XPC::Message::ReadFrom(*wsServer);
+		for (auto it = msg.begin(); it != msg.end(); ++it) {
+			if (it->GetHead() != "")
+			{
+				messageExists = true;
+				XPC::MessageHandlers::HandleMessage(*it);
+			}
+		}
+
+		if (messageExists == false) {
 			break;
 		}
-		XPC::MessageHandlers::HandleMessage(msg);
 
 		if (benchmarkingSwitch > 0)
 		{

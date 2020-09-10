@@ -16,6 +16,8 @@
 #include <unistd.h>
 #endif
 
+#include "ISocket.h"
+
 
 namespace XPC
 {
@@ -27,7 +29,7 @@ namespace XPC
 	/// \since 1.0
 	/// \date Intial Version: 2015-04-10
 	/// \date Last Updated: 2015-05-11
-	class UDPSocket
+	class UDPSocket : public ISocket
 	{
 	public:
 		/// Initializes a new instance of the XPCSocket class bound to the
@@ -48,7 +50,7 @@ namespace XPC
 		///                   of the remote host.
 		/// \returns		  The number of bytes read, or a negative number if
 		///                   an error occurs.
-		int Read(unsigned char* buffer, int size, sockaddr* remoteAddr) const;
+		int Read(unsigned char* buffer, int size, sockaddr* remoteAddr);
 
 		/// Sends data to the specified remote endpoint.
 		///

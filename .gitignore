@@ -100,3 +100,4 @@ xpcPlugin/XPlaneConnect/*
 xpcPlugin/xpcPlugin/.vs/xpcPlugin/v15/Browse.VC.opendb
 xpcPlugin/xpcPlugin/.vs/xpcPlugin/v15/Browse.VC.db
 xpcPlugin/xpcPlugin/xpcPlugin.vcxproj.filters
+xpcPlugin/asio*

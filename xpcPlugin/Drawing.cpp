@@ -116,6 +116,7 @@ namespace XPC
 
 	float fps_to_knot = 0.592484;
 	float meter_to_ft = 3.28084;
+	float ft_to_meter = 1 / meter_to_ft;
 
 	float conversion_speed = meter_to_ft * fps_to_knot;
 	float conversion_distance = meter_to_ft;
@@ -191,6 +192,40 @@ namespace XPC
 		glEnd();
 	}
 
+	static void gl_drawRectangle(float x, float y, float z, float w, float h, float d)
+	{
+
+		glBegin(GL_QUAD_STRIP);
+		// Top
+		glVertex3f(x - w, y + h, z - d);
+		glVertex3f(x + w, y + h, z - d);
+		glVertex3f(x - w, y + h, z + d);
+		glVertex3f(x + w, y + h, z + d);
+		// Front
+		glVertex3f(x - w, y - h, z + d);
+		glVertex3f(x + w, y - h, z + d);
+		// Bottom
+		glVertex3f(x - w, y - h, z - d);
+		glVertex3f(x + w, y - h, z - d);
+		// Back
+		glVertex3f(x - w, y + h, z - d);
+		glVertex3f(x + w, y + h, z - d);
+
+		glEnd();
+		glBegin(GL_QUADS);
+		// Left
+		glVertex3f(x - w, y + h, z - d);
+		glVertex3f(x - w, y + h, z + d);
+		glVertex3f(x - w, y - h, z + d);
+		glVertex3f(x - w, y - h, z - d);
+		// Right
+		glVertex3f(x + w, y + h, z + d);
+		glVertex3f(x + w, y + h, z - d);
+		glVertex3f(x + w, y - h, z - d);
+		glVertex3f(x + w, y - h, z + d);
+
+		glEnd();
+	}
 
 	static void gl_drawSphere(float x, float y, float z, float r)
 	{
@@ -247,6 +282,10 @@ namespace XPC
 			XPLMDrawString(rgb, msgX, y, msgVal + newLines[i], NULL, xplmFont_Proportional);
 			y -= LINE_HEIGHT;
 		}
+
+		XPLMDataRef throttle_dref = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
+		float throttle = XPLMGetDataf(throttle_dref);
+		XPLMDrawString(rgb, 100, 100, (char*)(std::to_string(throttle).c_str()), NULL, xplmFont_Proportional);
 		
 
 		if (numWaypoints == 0) {
@@ -405,6 +444,7 @@ namespace XPC
 
 		float blue_heading_deg = XPLMGetDataf(ref_blueHeading_deg);
 		float blue_pitch_deg = XPLMGetDataf(ref_bluePitch_deg);
+		float blue_roll_deg = XPLMGetDataf(ref_blueRoll_deg);
 
 		float red_x = XPLMGetDataf(ref_redX);
 		float red_y = XPLMGetDataf(ref_redY);
@@ -422,7 +462,8 @@ namespace XPC
 
 		Eigen::Matrix3f blue_rot;
 		blue_rot = Eigen::AngleAxisf(-blue_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
-			* Eigen::AngleAxisf(blue_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX());
+			* Eigen::AngleAxisf(blue_pitch_deg*M_PI / 180.0, Eigen::Vector3f::UnitX())
+			* Eigen::AngleAxisf(-blue_roll_deg * M_PI / 180.0, Eigen::Vector3f::UnitZ());
 
 		Eigen::Matrix3f red_rot;
 		red_rot = Eigen::AngleAxisf(-red_heading_deg * M_PI / 180.0, Eigen::Vector3f::UnitY())
@@ -435,8 +476,8 @@ namespace XPC
 		Eigen::Vector3f v_self_track_angle = rot_mat_HP(blue_heading_deg, blue_pitch_deg*M_PI / 180.0) * v;
 		float trackAngle_deg = 180.0 - acosf(v_rel.transpose() * v_self_track_angle) * 180.0 / M_PI;
 
-		float score_dist = 3000;
-		if (dist_m < 3000) {
+		float score_dist = score_WEZ_max_ft * ft_to_meter;
+		if (dist_m < score_WEZ_max_ft * ft_to_meter) {
 			score_dist = dist_m;
 		}
 
@@ -526,33 +567,63 @@ namespace XPC
 			glVertex3f(p_x, p_y, p_z);
 			glVertex3f(p_x + red_right[0], p_y + red_right[1], p_z + red_right[2]);
 			glEnd();
-			
-
-
-			/*
-			Eigen::Vector3f red_right = red_rot * Eigen::Vector3f(100, 0, 0);
-			glColor3f(0.0F, 0.0F, 1.0F);
-			glBegin(GL_LINES);
-			glVertex3f((float)red_x, (float)red_y, (float)red_z);
-			glVertex3f(red_x + red_right[0], red_y + red_right[1], red_z + red_right[2]);
-			glEnd();
-			*/
 		}
 
 		// Draw WEZ Circle (really a sphere)
 		float r = dist_m * (score_WEZ_angle_deg*M_PI / 180.0);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		if (dist_m < 3000 / meter_to_ft)
+		if (dist_m < score_WEZ_max_ft * ft_to_meter)
 			if(trackAngle_deg > 90)
 				glColor4f(1.0F, 0.0F, 0.0F, 0.5);
 			else
 				glColor4f(0.0F, 1.0F, 0.0F, 0.5);
 			
 		else
-			glColor4f(0.0F, 0.0F, 0.0F, 0.5);
+			glColor4f(0.0F, 0.0F, 0.0F, 0.25);
 		gl_drawSphere(blue_x + blue_forward[0], blue_y + blue_forward[1], blue_z + blue_forward[2], r);
+
+		// If outside range, draw a sphere indicating the desired range
+		if (dist_m >= score_WEZ_max_ft * ft_to_meter) {
+			Eigen::Vector3f blue_forward = blue_rot * Eigen::Vector3f(0, 0, -score_WEZ_max_ft * ft_to_meter);
+			glColor4f(0.0F, 0.0F, 1.0F, 0.25);
+			gl_drawSphere(blue_x + blue_forward[0], blue_y + blue_forward[1], blue_z + blue_forward[2], score_WEZ_max_ft * ft_to_meter * (score_WEZ_angle_deg*M_PI / 180.0));
+		}
 		glDisable(GL_BLEND);
+
+
+		///////////////////////////////////////////////////////////////////
+		// Throttle bar
+		///////////////////////////////////////////////////////////////////
+		XPLMDataRef throttle_dref = XPLMFindDataRef("sim/cockpit2/engine/actuators/throttle_ratio_all");
+		float throttle = XPLMGetDataf(throttle_dref);
+		Eigen::Vector3f blue_throttleRender = blue_rot * Eigen::Vector3f(3.5, 0, -20);
+
+		Eigen::Matrix3f roll_rot;
+		roll_rot = Eigen::AngleAxisf(-0 * M_PI / 180.0, Eigen::Vector3f::UnitY())
+			* Eigen::AngleAxisf(0 * M_PI / 180.0, Eigen::Vector3f::UnitX())
+			* Eigen::AngleAxisf(-blue_roll_deg * M_PI / 180.0, Eigen::Vector3f::UnitZ());
+
+		Eigen::Vector3f downThrottlePoint = blue_rot * Eigen::Vector3f(3.5, -1 * (1 - throttle), -20);
+		Eigen::Vector3f downThrottleZero = blue_rot * Eigen::Vector3f(3.5, -1, -20);
+
+		Eigen::Vector3f right(0, 0, 0);
+
+		glColor4f(1.0F, 0.0F, 0.0F, 0.5);
+		glLineWidth(10);
+		glBegin(GL_LINES);
+		glVertex3f(blue_x + blue_throttleRender[0], blue_y + blue_throttleRender[1], blue_z + blue_throttleRender[2]);
+		glVertex3f(blue_x + downThrottlePoint[0], blue_y + downThrottlePoint[1], blue_z + downThrottlePoint[2]);
+		glEnd();
+
+		glColor4f(0.0F, 1.0F, 0.0F, 0.5);
+		glLineWidth(10);
+		glBegin(GL_LINES);
+		glVertex3f(blue_x + downThrottlePoint[0], blue_y + downThrottlePoint[1], blue_z + downThrottlePoint[2]);
+		glVertex3f(blue_x + downThrottleZero[0], blue_y + downThrottleZero[1], blue_z + downThrottleZero[2]);
+		glEnd();
+
+	
 
 		return 0;
 	}

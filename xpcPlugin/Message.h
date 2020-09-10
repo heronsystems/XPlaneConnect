@@ -3,7 +3,9 @@
 #ifndef XPCPLUGIN_MESSAGE_H_
 #define XPCPLUGIN_MESSAGE_H_
 
-#include "UDPSocket.h"
+#include "ISocket.h"
+
+#include <list>
 
 namespace XPC
 {
@@ -24,7 +26,7 @@ namespace XPC
 		/// \returns    A message parsed from the data read from sock. If no
 		///             data was read or an error occurs, returns a message
 		///             with the size set to 0.
-		static Message ReadFrom(const UDPSocket& sock);
+		static std::list<Message> ReadFrom(ISocket& sock);
 
 		/// Gets the message header.
 		std::string GetHead() const;

@@ -27,6 +27,8 @@
 #include <cstring>
 #include <cstdint>
 
+#include "UDPSocket.h"
+
 #define MULTICAST_GROUP "239.255.1.1"
 #define MULITCAST_PORT 49710
 
@@ -38,11 +40,11 @@ namespace XPC
 
 	std::string MessageHandlers::connectionKey;
 	MessageHandlers::ConnectionInfo MessageHandlers::connection;
-	UDPSocket* MessageHandlers::sock;
+	ISocket* MessageHandlers::sock;
 	
 	static sockaddr multicast_address = UDPSocket::GetAddr(MULTICAST_GROUP, MULITCAST_PORT);
 
-	void MessageHandlers::SetSocket(UDPSocket* socket)
+	void MessageHandlers::SetSocket(ISocket* socket)
 	{
 		Log::WriteLine(LOG_TRACE, "MSGH", "Setting socket");
 		MessageHandlers::sock = socket;

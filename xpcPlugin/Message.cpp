@@ -9,20 +9,47 @@
 #include <sstream>
 #include <string>
 
+#include <list>
+
 namespace XPC
 {
 	Message::Message() {}
 
-	Message Message::ReadFrom(const UDPSocket& sock)
+	std::list<Message> Message::ReadFrom(ISocket& sock)
 	{
-		Message m;
-		int len = sock.Read(m.buffer, bufferSize, &m.source);
-		m.size = len < 0 ? 0 : len;
-		if (len > 0)
-		{
-			Log::FormatLine(LOG_TRACE, "MESG", "Read message with length %i", len);
+
+		static const std::size_t bufferSize = 4096;
+		unsigned char buffer[bufferSize];
+		sockaddr addr;
+		int len = sock.Read(buffer, bufferSize, &addr);
+		if (len <= 0) return {};
+
+
+		std::list<Message> arr = {};
+
+		int msgStart = 0;
+		for (int i = 4; i < len-4; i++) {
+			std::string potentialCommand = { (char)buffer[i], (char)buffer[i + 1], (char)buffer[i + 2], (char)buffer[i + 3] };
+
+			if (potentialCommand == "DREF" || potentialCommand == "WYPT" || potentialCommand == "TEXT") {
+				Message m;
+				memcpy(m.buffer, buffer + msgStart, i + 1 - msgStart);
+				m.source = addr;
+				m.size = i + 1 - msgStart;
+				Log::FormatLine(LOG_TRACE, "MESG", "Read message with length %i", m.size);
+				msgStart = i;
+				arr.push_back(m);
+			}
 		}
-		return m;
+
+		Message m;
+		memcpy(m.buffer, buffer + msgStart, len - msgStart);
+		m.source = addr;
+		m.size = len - msgStart;
+		Log::FormatLine(LOG_TRACE, "MESG", "Read message with length %i", m.size);
+		arr.push_back(m);
+
+		return arr;
 	}
 
 	std::string Message::GetHead() const

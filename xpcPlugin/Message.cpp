@@ -31,12 +31,12 @@ namespace XPC
 		for (int i = 4; i < len-4; i++) {
 			std::string potentialCommand = { (char)buffer[i], (char)buffer[i + 1], (char)buffer[i + 2], (char)buffer[i + 3] };
 
-			if (potentialCommand == "DREF" || potentialCommand == "WYPT" || potentialCommand == "TEXT") {
+			if (potentialCommand == "POSI" || potentialCommand == "DREF" || potentialCommand == "WYPT" || potentialCommand == "TEXT") {
 				Message m;
-				memcpy(m.buffer, buffer + msgStart, i + 1 - msgStart);
+				memcpy(m.buffer, buffer + msgStart, i - msgStart);
 				m.source = addr;
-				m.size = i + 1 - msgStart;
-				Log::FormatLine(LOG_TRACE, "MESG", "Read message with length %i", m.size);
+				m.size = i - msgStart;
+				Log::FormatLine(LOG_TRACE, "MESG", "AAARead message with length %i", m.size);
 				msgStart = i;
 				arr.push_back(m);
 			}

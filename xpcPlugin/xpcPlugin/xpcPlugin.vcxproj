@@ -103,7 +103,7 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>..\XPlaneConnect\</OutDir>
     <TargetExt>.xpl</TargetExt>
-    <IncludePath>..\SDK\CHeaders\XPLM;..\;$(IncludePath)</IncludePath>
+    <IncludePath>C:\asio-1.18.0\include;..\SDK\CHeaders\XPLM;..\;$(IncludePath)</IncludePath>
     <LibraryPath>..\xpcPlugin\SDK\Libraries\Win;$(LibraryPath)</LibraryPath>
     <TargetName>win</TargetName>
   </PropertyGroup>
@@ -125,7 +125,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetExt>.xpl</TargetExt>
-    <IncludePath>..\SDK\CHeaders\XPLM;..\;$(IncludePath)</IncludePath>
+    <IncludePath>C:\asio-1.18.0\include;..\SDK\CHeaders\XPLM;..\;$(IncludePath)</IncludePath>
     <LibraryPath>..\xpcPlugin\SDK\Libraries\Win;$(LibraryPath)</LibraryPath>
     <TargetName>win</TargetName>
     <LinkIncremental>true</LinkIncremental>
